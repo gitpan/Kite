@@ -1,0 +1,9 @@
+Changes
+MANIFEST
+Makefile.PL
+README
+test.pl
+bin/okprof
+lib/Kite.pm
+lib/Kite/Base.pm
+lib/Kite/Profile.pm
