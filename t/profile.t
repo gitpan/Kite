@@ -1,13 +1,10 @@
 #!/usr/bin/perl -w
-#
-# beginnings of a test script
-#
 
 use strict;
-use lib qw( lib );
-use Kite::Profile;
+use lib qw( ./lib ../lib);
+use Kite;
 
-print "1..16\n";
+print "1..20\n";
 my $n = 0;
 
 sub ok {
@@ -15,7 +12,16 @@ sub ok {
     print "ok ", ++$n, "\n";
 }
 
-#------------------------------------------------------------------------
+my $p0 = Kite->profile({
+    NAME => 'Foo Bar',
+});
+
+ok( ! $p0 );
+ok( $Kite::ERROR eq 'profile X values not specified' );
+
+$p0 = Kite->profile( name => 'Foo Bar', x => [], y => [] );
+ok( $p0 );
+ok( $p0->name eq 'Foo Bar' );
 
 my $p1 = Kite::Profile->new({
     NAME => 'My Test Profile',

@@ -15,9 +15,8 @@
 #   This module is free software; you can redistribute it and/or
 #   modify it under the same terms as Perl itself.
 #
-#------------------------------------------------------------------------
-#
-#   $Id
+# VERSION
+#   $Id: Profile.pm,v 1.3 2000/10/18 08:37:49 abw Exp $
 #
 #========================================================================
  
@@ -30,26 +29,29 @@ use Kite::Base;
 use base qw( Kite::Base );
 use vars qw( $VERSION $ERROR $DEBUG );
 
-$VERSION = sprintf("%d.%02d", q$Revision: 1.1.1.1 $ =~ /(\d+)\.(\d+)/);
-$DEBUG   = 0;
+$VERSION = sprintf("%d.%02d", q$Revision: 1.3 $ =~ /(\d+)\.(\d+)/);
+$DEBUG   = 0 unless defined $DEBUG;
 $ERROR   = '';
 
 
 #------------------------------------------------------------------------
-# _init(\%params)
+# init(\%params)
 #
-# Private initialisation method called by the Kite::Base base class 
-# constructor, new().  A reference to a hash array of configuration 
+# Initialisation method called by the Kite::Base base class
+# constructor, new().  A reference to a hash array of configuration
 # parameters is passed.  The method returns a true value ($self) if
-# successful, or undef on error, with the internal ERROR value set.  
+# successful, or undef on error, with the internal ERROR value set.
 #------------------------------------------------------------------------
 
-sub _init {
+sub init {
     my ($self, $params) = @_;
     
-    # if a FILE parameter is defined then we call _parse_file() to load and
+    # if a FILE parameter is defined then we call parse_file() to load and
     # parse the profile.  If TEXT is defined then we call _parse_text().
     # Otherwise we copy any NAME, X and Y parameters.
+
+    # map all config parameters to upper case
+    @$params{ map { uc $_ } keys %$params } = values %$params;
 
     if ($params->{ FILE }) {
 	$self->parse_file($params->{ FILE }) || return undef;	## RETURN ##
@@ -60,15 +62,15 @@ sub _init {
     else {
 	my @keys = qw( NAME X Y );
 	@$self{ @keys } = @$params{ @keys };
-	return $self->error("profile NAME not specified\n")
+	return $self->error("profile NAME not specified")
 	    unless $self->{ NAME };
-	return $self->error("profile X values not specified\n")
+	return $self->error("profile X values not specified")
 	    unless $self->{ X };
-	return $self->error("invalid profile X values (expects list ref)\n")
+	return $self->error("invalid profile X values (expects list ref)")
 	    unless ref $self->{ X } eq 'ARRAY';
-	return $self->error("profile Y values not specified\n")
+	return $self->error("profile Y values not specified")
 	    unless $self->{ Y };
-	return $self->error("invalid profile Y values (expects list ref)\n")
+	return $self->error("invalid profile Y values (expects list ref)")
 	    unless ref $self->{ Y } eq 'ARRAY';
     }
 
@@ -79,7 +81,7 @@ sub _init {
 #------------------------------------------------------------------------
 # parse_file($file)
 #
-# Method called by _init() to load a file and parse the contents
+# Method called by init() to load a file and parse the contents
 # (via a call to parse_text()) when a FILE parameter is specified.
 #------------------------------------------------------------------------
 
@@ -95,7 +97,7 @@ sub parse_file {
     # undefine Input Record Separator and read entire file in one go
     local $/ = undef;
     open(FIN, $filename) 
-	|| return $self->error("$filename: $!\n");
+	|| return $self->error("$filename: $!");
     $text = <FIN>;
     close(FIN);
 
@@ -106,7 +108,7 @@ sub parse_file {
 #------------------------------------------------------------------------
 # parse_text($text)
 #
-# Method called by _init() or _parse_file() to parse the profile
+# Method called by init() or parse_file() to parse the profile
 # definition text into an internal form. 
 #------------------------------------------------------------------------
 
@@ -119,7 +121,7 @@ sub parse_text {
     print STDERR "parse_text(\"$text\")\n" if $DEBUG;
 
     $self->{ NAME } = shift(@lines) 
-	|| return $self->error("Profile name not found in $source\n");
+	|| return $self->error("Profile name not found in $source");
 
     while (defined($line = shift @lines)) {
 	chomp $line;
@@ -155,10 +157,22 @@ sub name {
 
 
 #------------------------------------------------------------------------
+# x()
+# y()
 # nodes()
 #
-# Return a pair of referneces to the X and Y value lists.
+# Return a pair of references to the X and Y value lists.
 #------------------------------------------------------------------------
+
+sub x {
+    my $self = shift;
+    return $self->{ X };
+}
+
+sub y {
+    my $self = shift;
+    return $self->{ Y };
+}
 
 sub nodes {
     my $self = shift;
@@ -619,6 +633,26 @@ sub output {
     return $text;
 }
 
+sub postscript {
+    my $self = shift;
+    my $vars = shift || { };
+    
+    require Kite::PScript::Defs;
+    require Template;
+
+    my $doc = $self->ps_template();
+    my $template = Template->new( POST_CHOMP => 1);
+    $vars->{ defs } = Kite::PScript::Defs->new();
+    $vars->{ self } = $self;
+    $vars->{ border } = 5 unless defined $vars->{ border };
+    $vars->{ rotate } ||= 0;
+    $vars->{ translate } ||= [0,0];
+
+    my $out = '';
+    $template->process(\$doc, $vars, \$out)
+	|| return $self->error($template->error());
+    return $out;
+}
 
 #------------------------------------------------------------------------
 # _changed_size()
@@ -632,6 +666,99 @@ sub _changed_size {
     @$self{ qw( SIZE LENGTH HEIGHT MINX MAXX MINY MAXY ) } = (undef) x 7;
 }
  
+
+#------------------------------------------------------------------------
+
+sub ps_template {
+    return <<'EOF';
+[% USE fix = format('%.2f') -%]
+%!PS-Adobe-3.0
+[% IF name %]
+%%Title: [% name %]
+[% END %]
+%%EndComments
+
+[% defs.mm %]
+[% defs.lines %]
+[% defs.cross %]
+[% defs.dot %]
+[% defs.circle %]
+[% defs.crop %]
+[% defs.outline %]
+
+/border [% border %] mm def
+[% defs.clip +%]
+[% regmarks ? defs.reg : defs.noreg +%]
+[% defs.tiles +%]
+[% defs.tilemap +%]
+
+/Times-Roman findfont dup dup
+  24 scalefont /big-text exch def
+  14 scalefont /mid-text exch def
+  10 scalefont /min-text exch def
+
+% define profile
+/tileimage {
+  gsave
+[% IF outline %]
+  tilepath [% outline %] mm outline
+[% END %]
+
+  [% rotate %] rotate
+  [% translate.0 %] mm [% translate.1 %] mm translate
+
+  newpath linedashed
+  [% self.min_x - 5 %] mm 0 mm moveto
+  [% self.max_x + 5 %] mm 0 lineto
+  [% self.min_x %] mm -5 mm moveto [% self.min_x %] mm 5 mm lineto
+  [% self.max_x %] mm -5 mm moveto [% self.max_x %] mm 5 mm lineto
+  stroke
+
+  [% x = self.x
+     y = self.y 
+  %]
+  newpath linenormal
+  [% FOREACH i = [0 .. x.max ] %]
+     [% fix(x.$i) %] mm [% fix(y.$i) %] mm 
+        [%- loop.first ? ' moveto' : ' lineto' +%]
+  [% END %]
+  stroke
+  grestore
+} def
+
+/tilepath {
+  0 0 translate
+  [% rotate %] rotate
+  [% translate.0 %] mm [% translate.1 %] mm translate
+  newpath
+  [% x = self.x
+     y = self.y 
+  %]
+  [% FOREACH i = [0 .. x.max ] %]
+     [% fix(x.$i) %] mm [% fix(y.$i) %] mm 
+        [%- loop.first ? ' moveto' : ' lineto' +%]
+  [% END %]
+  [% translate.0 %] neg mm [% translate.1 %] mm neg translate
+  [% rotate %] neg rotate
+} def
+
+
+/tilepage {
+  regmarks
+  /x border 3 mm add def
+  /y border 3 mm add def
+[% IF map %]
+  tilemap
+[% END %]
+} def    
+
+tilepath tiles
+[% defs.dotiles %]
+
+EOF
+}
+
+
 
 1; 
 
@@ -971,7 +1098,7 @@ Andy Wardley E<lt>abw@kfs.orgE<gt>
 
 =head1 VERSION
 
-$Revision: 1.1.1.1 $
+$Revision: 1.3 $
 
 =head1 COPYRIGHT
 

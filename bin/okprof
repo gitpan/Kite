@@ -16,15 +16,15 @@
 #   This is free software; you can redistribute it and/or
 #   modify it under the same terms as Perl itself.
 #
-#------------------------------------------------------------------------
-#
-#   $Id
+# VERSION
+#   $Id: okprof,v 1.4 2000/10/18 08:37:49 abw Exp $
 #
 #========================================================================
 
 #!/usr/bin/perl -w
 
-use lib qw( lib ../lib );
+# for testing
+use lib qw( ./lib ../lib );
 use strict;
 use Kite::Profile;
 
@@ -413,7 +413,7 @@ Andy Wardley E<lt>abw@kfs.orgE<gt>
 
 =head1 VERSION
 
-$Revision: 1.1.1.1 $
+$Revision: 1.4 $
 
 =head1 COPYRIGHT
 
@@ -427,15 +427,6 @@ modify it under the same terms as Perl itself.
 L<Kite::Profile|Kite::Profile>
 
 =cut
-
-
-
-
-
-
-
-
-
 
 
 
